@@ -7,6 +7,7 @@ color 0A
 
 echo ========================================
 echo    WinFresh - Fresh Windows Install
+echo              by Fox1cek
 echo ========================================
 echo.
 echo This will install essential apps and remove bloatware.

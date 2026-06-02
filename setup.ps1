@@ -10,20 +10,15 @@
 
 $ErrorActionPreference = "Stop"
 
-# Colors for output
-$Green = "`e[32m"
-$Yellow = "`e[33m"
-$Red = "`e[31m"
-$Reset = "`e[0m"
-
+# Compatible colors for PowerShell 5.1+
 function Write-Status($Message, $Type = "Info") {
-    $icon = switch ($Type) {
-        "Success" { "$Green[✓]$Reset" }
-        "Warning" { "$Yellow[!]$Reset" }
-        "Error"   { "$Red[✗]$Reset" }
-        default   { "$Yellow[>]$Reset" }
+    switch ($Type) {
+        "Success" { Write-Host "[OK] " -ForegroundColor Green -NoNewline }
+        "Warning" { Write-Host "[!] " -ForegroundColor Yellow -NoNewline }
+        "Error"   { Write-Host "[X] " -ForegroundColor Red -NoNewline }
+        default   { Write-Host ">>> " -ForegroundColor Yellow -NoNewline }
     }
-    Write-Host "$icon $Message"
+    Write-Host $Message
 }
 
 # Check Windows version
@@ -35,6 +30,7 @@ if ($winVer.Major -lt 10) {
 
 Write-Host "`n==========================================" -ForegroundColor Cyan
 Write-Host "   WinFresh - Fresh Windows Setup" -ForegroundColor Cyan
+Write-Host "              by Fox1cek" -ForegroundColor Gray
 Write-Host "==========================================`n" -ForegroundColor Cyan
 
 # Install winget if missing
@@ -65,8 +61,7 @@ $apps = @(
     @{ Name = "PowerToys"; Id = "Microsoft.PowerToys" },
     @{ Name = "Notepad++"; Id = "Notepad++.Notepad++" },
     @{ Name = "ShareX"; Id = "ShareX.ShareX" },
-    @{ Name = "Steam"; Id = "Valve.Steam" },
-    @{ Name = "Microsoft Powertoys"; Id = "Microsoft.PowerToys" }
+    @{ Name = "Steam"; Id = "Valve.Steam" }
 )
 
 Write-Host "`n--- Installing Apps ---" -ForegroundColor Cyan
@@ -76,19 +71,22 @@ $failed = 0
 
 foreach ($app in $apps) {
     Write-Status "Installing $($app.Name)..."
+    Write-Host "    (this may take a minute...)" -ForegroundColor DarkGray
     try {
-        $result = winget install --id $app.Id --accept-source-agreements --accept-package-agreements --silent 2>&1
-        if ($LASTEXITCODE -eq 0) {
+        # Use --disable-interactivity to prevent hanging
+        $proc = Start-Process -FilePath "winget" -ArgumentList "install","--id",$app.Id,"--accept-source-agreements","--accept-package-agreements","--silent","--disable-interactivity" -Wait -PassThru -NoNewWindow
+        $exitCode = $proc.ExitCode
+        
+        if ($exitCode -eq 0) {
             Write-Status "$($app.Name) installed" "Success"
             $installed++
+        } elseif ($exitCode -eq -1978335189 -or $exitCode -eq 0x8A150061) {
+            # Already installed exit code
+            Write-Status "$($app.Name) already installed" "Success"
+            $installed++
         } else {
-            if ($result -match "already installed" -or $result -match "Found an existing") {
-                Write-Status "$($app.Name) already installed" "Success"
-                $installed++
-            } else {
-                Write-Status "Failed to install $($app.Name)" "Error"
-                $failed++
-            }
+            Write-Status "Failed to install $($app.Name) (exit: $exitCode)" "Error"
+            $failed++
         }
     } catch {
         Write-Status "Error installing $($app.Name): $_" "Error"
